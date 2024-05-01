@@ -1,0 +1,23 @@
+{
+	"name": "UniqKeyDBDevContainer",
+	"image": "mcr.microsoft.com/devcontainers/base:jammy",
+	"features": {
+		"ghcr.io/devcontainers/features/go:1": {
+			"version": "1.22"
+		}
+	},
+	"workspaceFolder": "/workspaces/unikeydb",
+	"workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/unikeydb,type=bind,consistency=cached",
+	"containerEnv": {},
+	"postStartCommand": "git config --global --add safe.directory ${containerWorkspaceFolder}",
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"golang.go",
+				"donjayamanne.githistory",
+				"eamodio.gitlens",
+				"DavidAnson.vscode-markdownlint"
+			]
+		}
+	}
+}
