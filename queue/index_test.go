@@ -29,6 +29,12 @@ func TestIndex(t *testing.T) {
 	idx, err = newIndex(f)
 	require.NoError(t, err)
 	testReadIndex(t, idx)
+
+	err = idx.Write(key+"z", 4)
+	require.NoError(t, err)
+	_, err = idx.Delete(key + "z")
+	require.NoError(t, err)
+	testReadIndex(t, idx)
 }
 
 func testWrite(t *testing.T, idx *index) {

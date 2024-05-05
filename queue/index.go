@@ -77,6 +77,48 @@ func (i *index) Write(in string, pos uint64) error {
 	return nil
 }
 
+func (i *index) Delete(in string) (pos uint64, err error) {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+
+	if i.size == 0 {
+		return 0, io.EOF
+	}
+
+	if err := i.buf.Flush(); err != nil {
+		return 0, err
+	}
+
+	if in == "" {
+		// latest
+		in = i.latestKey
+	}
+	pos, ok := i.mmap[in]
+	if !ok {
+		return 0, errors.New("not found")
+	}
+	delete(i.mmap, in)
+
+	for off := uint64(0); off < i.size; off += entwidth {
+		k := make([]byte, keyWidth)
+		_, err := i.file.ReadAt(k, int64(off))
+		if err != nil {
+			return 0, err
+		}
+		key := string(k)
+		if key != in {
+			continue
+		}
+		empty := make([]byte, keyWidth)
+		_, err = i.file.WriteAt(empty, int64(off))
+		if err != nil {
+			return 0, err
+		}
+		return pos, nil
+	}
+	return pos, nil
+}
+
 func (i *index) Flush() error {
 	i.mu.Lock()
 	defer i.mu.Unlock()
@@ -114,7 +156,11 @@ func (i *index) setup() error {
 		if err != nil {
 			return err
 		}
-		i.mmap[string(k)] = enc.Uint64(p)
+		key := string(k)
+		if key == "" {
+			continue
+		}
+		i.mmap[key] = enc.Uint64(p)
 	}
 
 	return nil

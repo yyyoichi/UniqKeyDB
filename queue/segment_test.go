@@ -29,7 +29,7 @@ func TestSegment(t *testing.T) {
 
 	for i := uint64(0); i < 3; i++ {
 		k := fmt.Sprintf("%s%d", key, i)
-		err := s.Append(k, want)
+		err := s.Write(k, want)
 		require.NoError(t, err)
 
 		got, err := s.Read(k)
@@ -49,7 +49,7 @@ func TestSegment(t *testing.T) {
 	require.False(t, s.IsMaxed())
 
 	k := fmt.Sprintf("%s%d", key, 3)
-	err = s.Append(k, want)
+	err = s.Write(k, want)
 	require.NoError(t, err)
 	require.True(t, s.IsMaxed())
 

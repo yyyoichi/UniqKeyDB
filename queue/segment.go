@@ -60,7 +60,7 @@ func (s *segment) Read(in string) ([]byte, error) {
 	return s.store.Read(pos)
 }
 
-func (s *segment) Append(in string, data []byte) error {
+func (s *segment) Write(in string, data []byte) error {
 	_, pos, err := s.store.Append(data)
 	if err != nil {
 		return err
@@ -69,6 +69,11 @@ func (s *segment) Append(in string, data []byte) error {
 		return err
 	}
 	return nil
+}
+
+func (s *segment) Delete(in string) error {
+	_, err := s.index.Delete(in)
+	return err
 }
 
 func (s *segment) IsMaxed() bool {
