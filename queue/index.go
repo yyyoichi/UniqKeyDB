@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	keyWidth uint64 = 32 // SHA-256
+	keyWidth uint64 = 64 // SHA-256
 	posWidth uint64 = 8
 	entwidth        = keyWidth + posWidth
 )
