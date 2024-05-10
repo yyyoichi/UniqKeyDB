@@ -45,7 +45,12 @@ func (i *KeyTimeItem) Value() ([]byte, error) {
 }
 
 func (i *KeyTimeItem) Unmarshal(data []byte) error {
-	return json.Unmarshal(data, i)
+	err := json.Unmarshal(data, i)
+	if err != nil {
+		return err
+	}
+	i.Timestamp = time.Unix(0, i.UnixNano)
+	return nil
 }
 
 func (i *KeyTimeItem) Clone() Item {
