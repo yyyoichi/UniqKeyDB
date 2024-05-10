@@ -65,6 +65,20 @@ func (p *partition) Read(item Item) error {
 	return err
 }
 
+func (p *partition) Delete(item Item) (old Item, err error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	key := item.StrSHA2526Key()
+	old = item.Clone()
+	s, _ := p.read(old)
+	if s == nil {
+		return
+	}
+	err = s.Delete(key)
+	return
+}
+
 func (p *partition) Close() error {
 	p.mu.Lock()
 	defer p.mu.Unlock()

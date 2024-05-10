@@ -48,4 +48,12 @@ func TestPartition(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, want0.UnixNano, old.(*KeyTimeItem).UnixNano)
 	require.NotEqual(t, want0.UnixNano, got0.UnixNano)
+
+	// delete
+	old, err = p.Delete(want0)
+	require.NoError(t, err)
+	require.NotNil(t, old)
+	// read
+	err = p.Read(want0)
+	require.Error(t, err)
 }
