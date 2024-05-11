@@ -1,4 +1,4 @@
-package queue
+package tinyamodb
 
 type Config struct {
 	BaseDir   string

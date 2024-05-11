@@ -1,4 +1,4 @@
-package queue
+package tinyamodb
 
 type PutKeyItemOutput struct {
 	// The Key values as they appeared before the PutItem operation
