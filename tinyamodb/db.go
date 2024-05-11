@@ -57,6 +57,9 @@ func New(dir string, c Config) (TinyamoDb, error) {
 
 	if l := len(db.partitions); l == 0 {
 		// create
+		if c.Partition.Num == 0 {
+			c.Partition.Num = 10
+		}
 		for i := 1; i <= int(c.Partition.Num); i++ {
 			db.partitions[i], err = newPartition(dir, i, c)
 			if err != nil {
