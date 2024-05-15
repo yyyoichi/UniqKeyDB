@@ -5,6 +5,8 @@ import (
 	"io"
 	"os"
 	"path"
+	"slices"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -41,20 +43,7 @@ func newPartition(dir string, id int, c Config) (*partition, error) {
 func (p *partition) Put(item Item) (old Item, err error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-
-	key := item.StrSHA2526Key()
-	old = item.Clone()
-	s, err := p.read(old)
-	// already exist in deactive segment
-	if s != nil && s != p.activeSegment {
-		if err := s.Delete(key); err != nil {
-			return old, err
-		}
-	}
-	// in active segment
-	// (over)write
-	err = p.write(item)
-	return old, err
+	return nil, p.write(item)
 }
 
 func (p *partition) Read(item Item) error {
@@ -65,18 +54,17 @@ func (p *partition) Read(item Item) error {
 	return err
 }
 
-func (p *partition) Delete(item Item) (old Item, err error) {
+func (p *partition) Delete(item Item) (Item, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
 	key := item.StrSHA2526Key()
-	old = item.Clone()
-	s, _ := p.read(old)
-	if s == nil {
-		return
+	for _, s := range p.segments {
+		if err := s.Delete(key); err != nil {
+			return nil, err
+		}
 	}
-	err = s.Delete(key)
-	return
+	return nil, nil
 }
 
 func (p *partition) Close() error {
@@ -107,7 +95,7 @@ func (p *partition) read(item Item) (*segment, error) {
 
 func (p *partition) write(item Item) error {
 	if p.activeSegment.IsMaxed() {
-		if err := p.newSegment(""); err != nil {
+		if err := p.newSegment(0); err != nil {
 			return err
 		}
 	}
@@ -125,37 +113,51 @@ func (p *partition) setup() error {
 	if err != nil {
 		return err
 	}
-	segmentUUid := make(map[string]int, len(files)/2)
+	segmentIdMap := make(map[uint64]int, len(files)/2)
 	for _, file := range files {
 		if file.IsDir() {
 			continue
 		}
-		uid := strings.TrimSuffix(
+		strSegmentId := strings.TrimSuffix(
 			file.Name(),
 			path.Ext(file.Name()),
 		)
-		segmentUUid[uid]++
+		segmentId, _ := strconv.Atoi(strSegmentId)
+		if segmentId == 0 {
+			continue
+		}
+
+		segmentIdMap[uint64(segmentId)]++
 	}
 
-	for uid, count := range segmentUUid {
+	segmentIds := make([]uint64, 0, len(segmentIdMap))
+	for id, count := range segmentIdMap {
 		if count != 2 {
 			continue
 		}
-		if err := p.newSegment(uid); err != nil {
+		segmentIds = append(segmentIds, id)
+	}
+
+	slices.Sort(segmentIds)
+	for _, id := range segmentIds {
+		if err = p.newSegment(id); err != nil {
 			return err
 		}
 	}
 
 	if p.activeSegment == nil {
-		if err := p.newSegment(""); err != nil {
+		if err := p.newSegment(0); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (l *partition) newSegment(uid string) error {
-	s, err := newSegment(l.dir, uid, l.config)
+func (l *partition) newSegment(segmentId uint64) error {
+	if segmentId == 0 {
+		segmentId = uint64(len(l.segments)) + 1
+	}
+	s, err := newSegment(l.dir, segmentId, l.config)
 	if err != nil {
 		return err
 	}

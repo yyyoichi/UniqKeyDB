@@ -4,28 +4,21 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-
-	"github.com/google/uuid"
 )
 
 type segment struct {
 	store *store
 	index *index
 
-	uuid   string
 	config Config
 }
 
-func newSegment(dir string, uid string, c Config) (*segment, error) {
-	if uid == "" {
-		uid = uuid.NewString()
-	}
+func newSegment(dir string, segmentId uint64, c Config) (*segment, error) {
 	s := &segment{
-		uuid:   uid,
 		config: c,
 	}
 	storeFile, err := os.OpenFile(
-		filepath.Join(dir, fmt.Sprintf("%s.store", s.uuid)),
+		filepath.Join(dir, fmt.Sprintf("%d.store", segmentId)),
 		os.O_RDWR|os.O_CREATE|os.O_APPEND,
 		0600,
 	)
@@ -38,7 +31,7 @@ func newSegment(dir string, uid string, c Config) (*segment, error) {
 	}
 
 	indexFile, err := os.OpenFile(
-		filepath.Join(dir, fmt.Sprintf("%s.index", s.uuid)),
+		filepath.Join(dir, fmt.Sprintf("%d.index", segmentId)),
 		os.O_RDWR|os.O_CREATE,
 		0600,
 	)

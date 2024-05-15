@@ -49,9 +49,8 @@ func TestDb(t *testing.T) {
 func testPutKey(t *testing.T, db TinyamoDb) {
 	t.Helper()
 	for _, key := range keys {
-		output, err := db.PutKey(context.Background(), key)
+		_, err := db.PutKey(context.Background(), key)
 		require.NoError(t, err)
-		require.Equal(t, key, *output.Key)
 	}
 }
 
@@ -66,9 +65,8 @@ func testReadKey(t *testing.T, db TinyamoDb) {
 func testDeleteKey(t *testing.T, db TinyamoDb) {
 	t.Helper()
 	for _, key := range keys {
-		output, err := db.DeleteKey(context.Background(), key)
+		_, err := db.DeleteKey(context.Background(), key)
 		require.NoError(t, err)
-		require.Equal(t, key, *output.Key)
 	}
 	for _, key := range keys {
 		output, err := db.ReadKey(context.Background(), key)

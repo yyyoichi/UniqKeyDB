@@ -23,7 +23,9 @@ func TestSegment(t *testing.T) {
 	c.Segment.MaxStoreBytes = 1024
 	c.Segment.MaxIndexBytes = entwidth * 3
 
-	s, err := newSegment(dir, "test", c)
+	const SEGMENT_ID uint64 = 1
+
+	s, err := newSegment(dir, SEGMENT_ID, c)
 	require.NoError(t, err)
 	require.False(t, s.IsMaxed())
 
@@ -44,7 +46,7 @@ func TestSegment(t *testing.T) {
 	c.Segment.MaxStoreBytes = uint64(len(want)+lenWidth) * 4
 	c.Segment.MaxIndexBytes = 1024
 
-	s, err = newSegment(dir, "test", c)
+	s, err = newSegment(dir, SEGMENT_ID, c)
 	require.NoError(t, err)
 	require.False(t, s.IsMaxed())
 
@@ -55,7 +57,7 @@ func TestSegment(t *testing.T) {
 
 	require.NoError(t, s.Remove())
 
-	s, err = newSegment(dir, "test", c)
+	s, err = newSegment(dir, SEGMENT_ID, c)
 	require.NoError(t, err)
 	require.False(t, s.IsMaxed())
 	require.NoError(t, s.Close())

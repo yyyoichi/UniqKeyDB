@@ -82,12 +82,11 @@ func New(dir string, c Config) (TinyamoDb, error) {
 func (db *db) PutKey(ctx context.Context, key string) (*PutKeyItemOutput, error) {
 	item := NewKeyTimeItem(key)
 	p := db.determinePartition(item.sha256Key)
-	old, err := p.Put(item)
+	_, err := p.Put(item)
 	if err != nil {
 		return nil, err
 	}
-	olditem := old.(*KeyTimeItem)
-	return &PutKeyItemOutput{Key: &olditem.RawKey}, nil
+	return &PutKeyItemOutput{}, nil
 }
 func (db *db) ReadKey(ctx context.Context, key string) (*ReadKeyItemOutput, error) {
 	item := NewKeyTimeItem(key)
@@ -104,12 +103,11 @@ func (db *db) ReadKey(ctx context.Context, key string) (*ReadKeyItemOutput, erro
 func (db *db) DeleteKey(ctx context.Context, key string) (*DeleteKeyItemOutput, error) {
 	item := NewKeyTimeItem(key)
 	p := db.determinePartition(item.sha256Key)
-	old, err := p.Delete(item)
+	_, err := p.Delete(item)
 	if err != nil {
 		return nil, err
 	}
-	olditem := old.(*KeyTimeItem)
-	return &DeleteKeyItemOutput{Key: &olditem.RawKey}, nil
+	return &DeleteKeyItemOutput{}, nil
 }
 func (db *db) Close() error {
 	for _, p := range db.partitions {

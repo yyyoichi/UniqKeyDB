@@ -12,9 +12,10 @@ func TestPartition(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
+	const PARTITION_ID = 1
 	var c Config
 	c.Segment.MaxIndexBytes = entwidth
-	p, err := newPartition(dir, 1, c)
+	p, err := newPartition(dir, PARTITION_ID, c)
 	require.NoError(t, err)
 
 	want0 := NewKeyTimeItem("key0")
@@ -34,25 +35,24 @@ func TestPartition(t *testing.T) {
 	err = p.Read(NewKeyTimeItem("key2"))
 	require.Error(t, err)
 
+	// close and open
 	err = p.Close()
 	require.NoError(t, err)
 
-	p, err = newPartition(dir, 1, c)
+	p, err = newPartition(dir, PARTITION_ID, c)
 	require.NoError(t, err)
 	err = p.Read(got0)
 	require.NoError(t, err)
 
 	// overwrite
 	got0 = NewKeyTimeItem("key0")
-	old, err := p.Put(got0)
+	_, err = p.Put(got0)
 	require.NoError(t, err)
-	require.Equal(t, want0.UnixNano, old.(*KeyTimeItem).UnixNano)
 	require.NotEqual(t, want0.UnixNano, got0.UnixNano)
 
 	// delete
-	old, err = p.Delete(want0)
+	_, err = p.Delete(want0)
 	require.NoError(t, err)
-	require.NotNil(t, old)
 	// read
 	err = p.Read(want0)
 	require.Error(t, err)
