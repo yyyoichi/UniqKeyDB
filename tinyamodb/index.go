@@ -19,7 +19,8 @@ type index struct {
 	file      *os.File
 	buf       *bufio.Writer
 	mu        sync.Mutex
-	mmap      map[string]uint64 // [sha-256]uint64(storepos)
+	mmap      map[string]uint64   // [sha-256]uint64(storepos)
+	dmap      map[string][]uint64 // duplication
 	size      uint64
 	latestKey string
 }
@@ -51,11 +52,11 @@ func (i *index) Read(in string) (pos uint64, err error) {
 		// latest
 		in = i.latestKey
 	}
-	pos, ok := i.mmap[in]
-	if !ok {
-		return 0, errors.New("not found")
+	poss, err := i.readAll(in)
+	if err != nil {
+		return 0, err
 	}
-	return pos, nil
+	return poss[len(poss)-1], nil
 }
 
 func (i *index) Write(in string, pos uint64) error {
@@ -63,7 +64,7 @@ func (i *index) Write(in string, pos uint64) error {
 	defer i.mu.Unlock()
 
 	// write to mmap
-	i.mmap[in] = pos
+	i.writeMem(in, pos)
 	// write to file
 	_, err := i.buf.Write([]byte(in))
 	if err != nil {
@@ -77,46 +78,44 @@ func (i *index) Write(in string, pos uint64) error {
 	return nil
 }
 
-func (i *index) Delete(in string) (pos uint64, err error) {
+func (i *index) Delete(in string) (poss []uint64, err error) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 
 	if i.size == 0 {
-		return 0, io.EOF
+		return nil, io.EOF
 	}
 
 	if err := i.buf.Flush(); err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	if in == "" {
 		// latest
 		in = i.latestKey
 	}
-	pos, ok := i.mmap[in]
-	if !ok {
-		return 0, errors.New("not found")
-	}
+
+	poss, err = i.readAll(in)
 	delete(i.mmap, in)
+	delete(i.dmap, in)
 
 	for off := uint64(0); off < i.size; off += entwidth {
 		k := make([]byte, keyWidth)
-		_, err := i.file.ReadAt(k, int64(off))
+		_, err = i.file.ReadAt(k, int64(off))
 		if err != nil {
-			return 0, err
+			return
 		}
 		key := string(k)
 		if key != in {
 			continue
 		}
-		empty := make([]byte, keyWidth)
+		empty := make([]byte, entwidth)
 		_, err = i.file.WriteAt(empty, int64(off))
 		if err != nil {
-			return 0, err
+			return
 		}
-		return pos, nil
 	}
-	return pos, nil
+	return
 }
 
 func (i *index) Flush() error {
@@ -140,8 +139,48 @@ func (i *index) Name() string {
 	return i.file.Name()
 }
 
+func (i *index) writeMem(in string, pos uint64) {
+	prev, ok := i.mmap[in]
+	if !ok {
+		i.mmap[in] = pos
+		return
+	}
+	// has prev data
+	if prev == 1 {
+		size := len(i.dmap[in])
+		m := make([]uint64, size+1)
+		copy(m, i.dmap[in])
+		m[size] = pos
+		// i.mmap[in] = 1
+		i.dmap[in] = m
+	} else {
+		m := make([]uint64, 2)
+		m[0] = prev
+		m[1] = pos
+		i.mmap[in] = 1
+		i.dmap[in] = m
+	}
+}
+
+func (i *index) readAll(in string) (poss []uint64, err error) {
+	pos, ok := i.mmap[in]
+	if !ok {
+		return nil, errors.New("not found")
+	}
+	if pos != 1 {
+		poss = make([]uint64, 1)
+		poss[0] = pos
+		return
+	}
+	// return latest
+	poss = make([]uint64, len(i.dmap[in]))
+	copy(poss, i.dmap[in])
+	return
+}
+
 func (i *index) setup() error {
 	i.mmap = make(map[string]uint64, i.size/entwidth)
+	i.dmap = make(map[string][]uint64)
 	if i.size == 0 {
 		return io.EOF
 	}
@@ -160,7 +199,8 @@ func (i *index) setup() error {
 		if key == "" {
 			continue
 		}
-		i.mmap[key] = enc.Uint64(p)
+		pos := enc.Uint64(p)
+		i.writeMem(key, pos)
 	}
 
 	return nil

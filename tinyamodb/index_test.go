@@ -20,7 +20,7 @@ func TestIndex(t *testing.T) {
 	idx, err := newIndex(f)
 	require.NoError(t, err)
 
-	testWrite(t, idx)
+	testWriteIndex(t, idx)
 	testReadIndex(t, idx)
 
 	err = idx.Flush()
@@ -35,23 +35,44 @@ func TestIndex(t *testing.T) {
 	_, err = idx.Delete(key + "z")
 	require.NoError(t, err)
 	testReadIndex(t, idx)
+
+	testDeleteIndex(t, idx)
+	require.Equal(t, 0, len(idx.mmap))
+	require.Equal(t, 0, len(idx.dmap))
 }
 
-func testWrite(t *testing.T, idx *index) {
+func testWriteIndex(t *testing.T, idx *index) {
 	t.Helper()
+	var rate uint64 = 10
 	for i := uint64(1); i < 4; i++ {
 		k := fmt.Sprintf("%s%d", key, i)
-		err := idx.Write(k, i)
+		err := idx.Write(k, i*rate)
+		require.NoError(t, err)
+	}
+	rate = 11
+	for i := uint64(1); i < 4; i++ {
+		k := fmt.Sprintf("%s%d", key, i)
+		err := idx.Write(k, i*rate)
 		require.NoError(t, err)
 	}
 }
 
 func testReadIndex(t *testing.T, idx *index) {
 	t.Helper()
+	var rate uint64 = 11
 	for i := uint64(1); i < 4; i++ {
 		k := fmt.Sprintf("%s%d", key, i)
 		pos, err := idx.Read(k)
 		require.NoError(t, err)
-		require.Equal(t, i, pos)
+		require.Equal(t, i*rate, pos)
+	}
+}
+
+func testDeleteIndex(t *testing.T, idx *index) {
+	for i := uint64(1); i < 4; i++ {
+		k := fmt.Sprintf("%s%d", key, i)
+		ppos, err := idx.Delete(k)
+		require.NoError(t, err)
+		require.Equal(t, []uint64{i * 10, i * 11}, ppos)
 	}
 }
