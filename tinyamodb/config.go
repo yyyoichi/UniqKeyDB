@@ -9,4 +9,7 @@ type Config struct {
 		MaxStoreBytes uint64
 		MaxIndexBytes uint64
 	}
+	Table struct {
+		PartitionKey string
+	}
 }

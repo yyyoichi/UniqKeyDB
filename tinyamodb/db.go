@@ -21,6 +21,7 @@ type db struct {
 	TinyamoDb
 	// partition id start with 1
 	partitions map[int]*partition
+	c          Config
 }
 
 func New(dir string, c Config) (TinyamoDb, error) {
@@ -32,6 +33,7 @@ func New(dir string, c Config) (TinyamoDb, error) {
 
 	db := &db{
 		partitions: make(map[int]*partition),
+		c:          c,
 	}
 
 	// read from children dir.
@@ -117,6 +119,49 @@ func (db *db) Close() error {
 	}
 	return nil
 }
+
+func (db *db) GetItem(ctx context.Context, input *GetItemInput) (*GetItemOutput, error) {
+	item, err := NewTinyamoDbItem(input.Key, db.c)
+	if err != nil {
+		return nil, err
+	}
+	p := db.determinePartition(item.sha256Key)
+	err = p.Read(item)
+	if err != nil && !errors.Is(err, io.EOF) {
+		if errors.Is(err, io.EOF) {
+			return &GetItemOutput{Item: nil}, nil
+		}
+		return nil, err
+	}
+	return &GetItemOutput{Item: item.Item}, nil
+}
+
+func (db *db) PutItem(ctx context.Context, input *PutItemInput) (*PutItemOutput, error) {
+	item, err := NewTinyamoDbItem(input.Item, db.c)
+	if err != nil {
+		return nil, err
+	}
+	p := db.determinePartition(item.sha256Key)
+	_, err = p.Put(item)
+	if err != nil {
+		return nil, err
+	}
+	return &PutItemOutput{}, nil
+}
+
+func (db *db) DeleteItem(ctx context.Context, input *DeleteItemInput) (*DeleteItemOutput, error) {
+	item, err := NewTinyamoDbItem(input.Key, db.c)
+	if err != nil {
+		return nil, err
+	}
+	p := db.determinePartition(item.sha256Key)
+	_, err = p.Delete(item)
+	if err != nil && !errors.Is(err, io.EOF) {
+		return nil, err
+	}
+	return &DeleteItemOutput{}, nil
+}
+
 func (db *db) determinePartition(sha256key []byte) *partition {
 	v := binary.BigEndian.Uint32(sha256key[:4])
 	id := int(v) % len(db.partitions)
