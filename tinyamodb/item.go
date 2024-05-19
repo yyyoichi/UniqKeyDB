@@ -23,7 +23,6 @@ type Item interface {
 	StrSHA2526Key() string
 	Value() ([]byte, error)
 	Unmarshal([]byte) error
-	Clone() Item
 }
 
 var (
@@ -455,15 +454,6 @@ func (d *decoder) decodeLen(r io.Reader) (int, error) {
 	return int(bl[0]), nil
 }
 
-func (i *tinyamodbItem) Clone() Item {
-	return &tinyamodbItem{
-		sha256Key:    i.sha256Key,
-		strSha256Key: i.strSha256Key,
-		Item:         i.Item,
-		UnixNano:     i.UnixNano,
-	}
-}
-
 type KeyTimeItem struct {
 	RawKey       string    `json:"k"`
 	sha256Key    []byte    `json:"-"`
@@ -496,16 +486,6 @@ func (i *KeyTimeItem) Unmarshal(data []byte) error {
 	}
 	i.Timestamp = time.Unix(0, i.UnixNano)
 	return nil
-}
-
-func (i *KeyTimeItem) Clone() Item {
-	return &KeyTimeItem{
-		RawKey:       i.RawKey,
-		sha256Key:    i.sha256Key,
-		strSha256Key: i.strSha256Key,
-		Timestamp:    i.Timestamp,
-		UnixNano:     i.UnixNano,
-	}
 }
 
 func (i *KeyTimeItem) init() {
