@@ -1,7 +1,6 @@
 package tinyamodb
 
 type Config struct {
-	BaseDir   string
 	Partition struct {
 		Num uint8
 	}

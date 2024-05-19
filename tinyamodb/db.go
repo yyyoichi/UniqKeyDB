@@ -10,20 +10,20 @@ import (
 	"strconv"
 )
 
-type db struct {
+type Db struct {
 	// partition id start with 1
 	partitions map[int]*partition
 	c          Config
 }
 
-func New(dir string, c Config) (*db, error) {
+func New(dir string, c Config) (*Db, error) {
 	if _, err := os.Stat(dir); err != nil {
 		if err = os.Mkdir(dir, 0755); err != nil {
 			return nil, err
 		}
 	}
 
-	db := &db{
+	db := &Db{
 		partitions: make(map[int]*partition),
 		c:          c,
 	}
@@ -73,7 +73,7 @@ func New(dir string, c Config) (*db, error) {
 	return db, nil
 }
 
-func (db *db) Close() error {
+func (db *Db) Close() error {
 	for _, p := range db.partitions {
 		if err := p.Close(); err != nil {
 			return err
@@ -82,7 +82,7 @@ func (db *db) Close() error {
 	return nil
 }
 
-func (db *db) GetItem(ctx context.Context, input *GetItemInput) (*GetItemOutput, error) {
+func (db *Db) GetItem(ctx context.Context, input *GetItemInput) (*GetItemOutput, error) {
 	item, err := NewTinyamoDbItem(input.Key, db.c)
 	if err != nil {
 		return nil, err
@@ -105,7 +105,7 @@ func (db *db) GetItem(ctx context.Context, input *GetItemInput) (*GetItemOutput,
 	return &GetItemOutput{Item: output.Item}, nil
 }
 
-func (db *db) PutItem(ctx context.Context, input *PutItemInput) (*PutItemOutput, error) {
+func (db *Db) PutItem(ctx context.Context, input *PutItemInput) (*PutItemOutput, error) {
 	item, err := NewTinyamoDbItem(input.Item, db.c)
 	if err != nil {
 		return nil, err
@@ -118,7 +118,7 @@ func (db *db) PutItem(ctx context.Context, input *PutItemInput) (*PutItemOutput,
 	return &PutItemOutput{}, nil
 }
 
-func (db *db) DeleteItem(ctx context.Context, input *DeleteItemInput) (*DeleteItemOutput, error) {
+func (db *Db) DeleteItem(ctx context.Context, input *DeleteItemInput) (*DeleteItemOutput, error) {
 	item, err := NewTinyamoDbItem(input.Key, db.c)
 	if err != nil {
 		return nil, err
@@ -131,7 +131,7 @@ func (db *db) DeleteItem(ctx context.Context, input *DeleteItemInput) (*DeleteIt
 	return &DeleteItemOutput{}, nil
 }
 
-func (db *db) determinePartition(sha256key []byte) *partition {
+func (db *Db) determinePartition(sha256key []byte) *partition {
 	v := binary.BigEndian.Uint32(sha256key[:4])
 	id := int(v) % len(db.partitions)
 	// partition id start with 1

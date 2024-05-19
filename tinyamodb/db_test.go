@@ -39,7 +39,7 @@ func TestTinyamoDb(t *testing.T) {
 	testDeleteItem(t, db)
 }
 
-func testPutItem(t *testing.T, db *db) {
+func testPutItem(t *testing.T, db *Db) {
 	t.Helper()
 	for _, v := range getAttributeValues() {
 		_, err := db.PutItem(context.Background(), &PutItemInput{
@@ -49,7 +49,7 @@ func testPutItem(t *testing.T, db *db) {
 	}
 }
 
-func testGetItem(t *testing.T, db *db) {
+func testGetItem(t *testing.T, db *Db) {
 	for _, v := range getAttributeValues() {
 		output, err := db.GetItem(context.Background(), &GetItemInput{
 			Key: v,
@@ -59,7 +59,7 @@ func testGetItem(t *testing.T, db *db) {
 	}
 }
 
-func testDeleteItem(t *testing.T, db *db) {
+func testDeleteItem(t *testing.T, db *Db) {
 	t.Helper()
 	for _, v := range getAttributeValues() {
 		_, err := db.DeleteItem(context.Background(), &DeleteItemInput{
