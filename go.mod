@@ -1,4 +1,4 @@
-module github.com/yyyoichi/uniqkeystore
+module github.com/yyyoichi/tinyamodb
 
 go 1.22.2
 
