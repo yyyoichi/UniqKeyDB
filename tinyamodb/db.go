@@ -126,14 +126,21 @@ func (db *db) GetItem(ctx context.Context, input *GetItemInput) (*GetItemOutput,
 		return nil, err
 	}
 	p := db.determinePartition(item.sha256Key)
-	err = p.Read(item)
+
+	output := &tinyamodbItem{
+		sha256Key:    item.sha256Key,
+		strSha256Key: item.strSha256Key,
+		UnixNano:     0,
+		Item:         nil,
+	}
+	err = p.Read(output)
 	if err != nil && !errors.Is(err, io.EOF) {
 		if errors.Is(err, io.EOF) {
 			return &GetItemOutput{Item: nil}, nil
 		}
 		return nil, err
 	}
-	return &GetItemOutput{Item: item.Item}, nil
+	return &GetItemOutput{Item: output.Item}, nil
 }
 
 func (db *db) PutItem(ctx context.Context, input *PutItemInput) (*PutItemOutput, error) {
