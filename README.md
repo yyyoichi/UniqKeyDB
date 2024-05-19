@@ -1,40 +1,60 @@
 # TinyamoDB
 
-Degraded version of DynamoDB.
+## Design and Implementation of a Simplified DynamoDB
 
-```golang
-type TinyamoDb interface {
-    PutKey(context.Context, string) (*PutKeyItemOutput, error)
-    DeleteKey(context.Context, string) (*DeleteKeyItemOutput, error)
-    ReadKey(context.Context, string) (*ReadKeyItemOutput, error)
-    Close() error
-}
-```
+This document describes the design and implementation of a simplified version of DynamoDB. The following features have been implemented:
+
+- [x] Saving data to local storage
+- [x] Partitioned data
+- [x] Using the primary key as the partition key
+- [x] Overwriting with Put
+
+Features not yet implemented:
+
+- [ ] Accessing historical data
+- [ ] Server and client implementation
+- [ ] Distributed system
+- [ ] Sort key
+- [ ] Global Secondary Index (GSI)
+- [ ] Other features
 
 ## How to use
 
 ```golang
 
-db, err := tinyamodb.New("/tmp", tinyamodb.Config{})
+// init db
+var c tinyamodb.Config
+c.Table.PartitionKey = "pk" // primary-key
+
+db, err := tinyamodb.New("/tmp/tinyamodb", c)
 if err != nil {
-    panic(err)
+    log.Fatalf("Error: %v", err)
+}
+defer db.Close()
+
+ctx := context.Background()
+_, err = db.PutItem(ctx, &tinyamodb.PutItemInput{Item: map[string]types.AttributeValue{
+    "pk":   &types.AttributeValueMemberS{Value: "USER#1"},
+    "name": &types.AttributeValueMemberS{Value: "Taro"},
+    "age":  &types.AttributeValueMemberN{Value: "20"},
+}})
+if err != nil {
+    log.Fatalf("Error: %v", err)
 }
 
-_, err := db.PutKey(ctx, "item1")
+output, err := db.GetItem(ctx, &tinyamodb.GetItemInput{
+    Key: map[string]types.AttributeValue{
+        "pk": &types.AttributeValueMemberS{Value: "USER#1"},
+    },
+})
 if err != nil {
-    panic(err)
+    log.Fatalf("Error: %v", err)
 }
-
-output, err := db.ReadKey(ctx, "item1")
-if err != nil {
-    panic(err)
-}
-fmt.Print(*output.Key) // item1
-
-output, err = db.ReadKey(ctx, "item2")
-if err != nil {
-    panic(err)
-}
-fmt.Print(ouput.Key) // <nil>
-
+name := output.Item["name"].(*types.AttributeValueMemberS)
+age := output.Item["age"].(*types.AttributeValueMemberN)
+fmt.Println(name.Value)
+fmt.Println(age.Value)
+// Output:
+// Taro
+// 20
 ```
