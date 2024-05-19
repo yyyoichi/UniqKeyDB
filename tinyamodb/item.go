@@ -27,6 +27,7 @@ type Item interface {
 var (
 	ErrNotFoundPartitionKey    = errors.New("not found partition key")
 	ErrInvalidPartitionKeyType = errors.New("partition key must be 'string' type")
+	ErrCannotUnmarshal         = errors.New("cannot unmarshal")
 )
 
 type tinyamodbItem struct {
@@ -76,7 +77,19 @@ func (i *tinyamodbItem) Value() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 func (i *tinyamodbItem) Unmarshal(data []byte) error {
-	return json.Unmarshal(data, i)
+	var r = bytes.NewReader(data)
+	var d decoder
+	av, unixNano, err := d.Decode(r)
+	if err != nil {
+		return err
+	}
+	i.UnixNano = unixNano
+	avm, ok := av.(*types.AttributeValueMemberM)
+	if !ok {
+		return err
+	}
+	i.Item = avm.Value
+	return nil
 }
 
 const (
@@ -94,8 +107,8 @@ const (
 
 type encoder struct{}
 
-func (e *encoder) Encode(av types.AttributeValue, unixtime int64, w io.Writer) error {
-	if _, err := w.Write([]byte{byte(unixtime)}); err != nil {
+func (e *encoder) Encode(av types.AttributeValue, unixNano int64, w io.Writer) error {
+	if _, err := w.Write([]byte{byte(unixNano)}); err != nil {
 		return err
 	}
 	return e.encode(av, w)
@@ -105,15 +118,15 @@ func (e *encoder) encode(av types.AttributeValue, w io.Writer) error {
 	case *types.AttributeValueMemberS:
 		return e.encodeString(v.Value, w)
 	case *types.AttributeValueMemberSS:
-		return e.encodeSliceS(v.Value, w)
+		return e.encodeSSet(v.Value, w)
 	case *types.AttributeValueMemberN:
 		return e.encodeNumber(v.Value, w)
 	case *types.AttributeValueMemberNS:
-		return e.encodeSliceN(v.Value, w)
+		return e.encodeNSet(v.Value, w)
 	case *types.AttributeValueMemberB:
 		return e.encodeBytes(v.Value, w)
 	case *types.AttributeValueMemberBS:
-		return e.encodeSliceB(v.Value, w)
+		return e.encodeBSet(v.Value, w)
 	case *types.AttributeValueMemberBOOL:
 		return e.encodeBool(v.Value, w)
 	case *types.AttributeValueMemberNULL:
@@ -127,14 +140,15 @@ func (e *encoder) encode(av types.AttributeValue, w io.Writer) error {
 }
 
 func (e *encoder) encodeString(v string, w io.Writer) error {
-	if _, err := w.Write([]byte{_bs, byte(len(v))}); err != nil {
+	bv := []byte(v)
+	if _, err := w.Write([]byte{_bs, byte(len(bv))}); err != nil {
 		return err
 	}
-	_, err := w.Write([]byte(v))
+	_, err := w.Write(bv)
 	return err
 }
 
-func (e *encoder) encodeSliceS(v []string, w io.Writer) error {
+func (e *encoder) encodeSSet(v []string, w io.Writer) error {
 	if _, err := w.Write([]byte{_bS, byte(len(v))}); err != nil {
 		return err
 	}
@@ -147,14 +161,15 @@ func (e *encoder) encodeSliceS(v []string, w io.Writer) error {
 }
 
 func (e *encoder) encodeNumber(v string, w io.Writer) error {
-	if _, err := w.Write([]byte{_bn, byte(len(v))}); err != nil {
+	bv := []byte(v)
+	if _, err := w.Write([]byte{_bn, byte(len(bv))}); err != nil {
 		return err
 	}
-	_, err := w.Write([]byte(v))
+	_, err := w.Write(bv)
 	return err
 }
 
-func (e *encoder) encodeSliceN(v []string, w io.Writer) error {
+func (e *encoder) encodeNSet(v []string, w io.Writer) error {
 	if _, err := w.Write([]byte{_bN, byte(len(v))}); err != nil {
 		return err
 	}
@@ -167,14 +182,14 @@ func (e *encoder) encodeSliceN(v []string, w io.Writer) error {
 }
 
 func (e *encoder) encodeBytes(v []byte, w io.Writer) error {
-	if _, err := w.Write([]byte{_bb, byte(len(v))}); err != nil {
+	if err := e.encodeLen(_bb, len(v), w); err != nil {
 		return err
 	}
 	_, err := w.Write(v)
 	return err
 }
 
-func (e *encoder) encodeSliceB(v [][]byte, w io.Writer) error {
+func (e *encoder) encodeBSet(v [][]byte, w io.Writer) error {
 	if _, err := w.Write([]byte{_bB, byte(len(v))}); err != nil {
 		return err
 	}
@@ -233,6 +248,190 @@ func (e *encoder) encodeMap(v map[string]types.AttributeValue, w io.Writer) erro
 		}
 	}
 	return nil
+}
+
+func (e *encoder) encodeLen(_bx byte, l int, w io.Writer) error {
+	_, err := w.Write([]byte{_bx, byte(l)})
+	return err
+}
+
+type decoder struct{}
+
+func (d *decoder) Decode(r io.Reader) (types.AttributeValue, int64, error) {
+	var unixNanoB = make([]byte, 1)
+	if _, err := r.Read(unixNanoB); err != nil {
+		return nil, 0, err
+	}
+	av, err := d.decode(r)
+	return av, int64(unixNanoB[0]), err
+}
+
+func (d *decoder) decode(r io.Reader) (types.AttributeValue, error) {
+	var _bx = make([]byte, 1)
+	if _, err := r.Read(_bx); err != nil {
+		return nil, err
+	}
+	switch _bx[0] {
+	case _bs:
+		v, err := d.decodeStringNumber(r)
+		if err != nil {
+			return nil, err
+		}
+		return &types.AttributeValueMemberS{Value: v}, nil
+	case _bS:
+		v, err := d.decodeSNSet(r)
+		if err != nil {
+			return nil, err
+		}
+		return &types.AttributeValueMemberSS{Value: v}, nil
+	case _bn:
+		v, err := d.decodeStringNumber(r)
+		if err != nil {
+			return nil, err
+		}
+		return &types.AttributeValueMemberN{Value: v}, nil
+	case _bN:
+		v, err := d.decodeSNSet(r)
+		if err != nil {
+			return nil, err
+		}
+		return &types.AttributeValueMemberNS{Value: v}, nil
+	case _bb:
+		v, err := d.decodeBytes(r)
+		if err != nil {
+			return nil, err
+		}
+		return &types.AttributeValueMemberB{Value: v}, nil
+	case _bB:
+		v, err := d.decodeBSet(r)
+		if err != nil {
+			return nil, err
+		}
+		return &types.AttributeValueMemberBS{Value: v}, nil
+	case _bo:
+		v, err := d.decodeBoolNull(r)
+		if err != nil {
+			return nil, err
+		}
+		return &types.AttributeValueMemberBOOL{Value: v}, nil
+	case _bl:
+		v, err := d.decodeList(r)
+		if err != nil {
+			return nil, err
+		}
+		return &types.AttributeValueMemberL{Value: v}, nil
+	case _bm:
+		v, err := d.decodeMap(r)
+		if err != nil {
+			return nil, err
+		}
+		return &types.AttributeValueMemberM{Value: v}, nil
+	}
+	return nil, errors.New("unexpected identifier")
+}
+
+func (d *decoder) decodeStringNumber(r io.Reader) (string, error) {
+	v, err := d.decodeBytes(r)
+	if err != nil {
+		return "", err
+	}
+	return string(v), nil
+}
+
+func (d *decoder) decodeSNSet(r io.Reader) ([]string, error) {
+	l, err := d.decodeLen(r)
+	if err != nil {
+		return nil, err
+	}
+	var v = make([]string, l)
+	for i := range l {
+		s, err := d.decodeStringNumber(r)
+		if err != nil {
+			return nil, err
+		}
+		v[i] = s
+	}
+	return v, nil
+}
+
+func (d *decoder) decodeBytes(r io.Reader) ([]byte, error) {
+	l, err := d.decodeLen(r)
+	if err != nil {
+		return nil, err
+	}
+	var v = make([]byte, l)
+	if _, err := r.Read(v); err != nil {
+		return nil, err
+	}
+	return v, nil
+}
+
+func (d *decoder) decodeBSet(r io.Reader) ([][]byte, error) {
+	l, err := d.decodeLen(r)
+	if err != nil {
+		return nil, err
+	}
+	var v = make([][]byte, l)
+	for i := range l {
+		s, err := d.decodeBytes(r)
+		if err != nil {
+			return nil, err
+		}
+		v[i] = s
+	}
+	return v, nil
+}
+
+func (d *decoder) decodeBoolNull(r io.Reader) (bool, error) {
+	bv := make([]byte, 1)
+	if _, err := r.Read(bv); err != nil {
+		return false, err
+	}
+	return bv[0] == '1', nil
+}
+
+func (d *decoder) decodeList(r io.Reader) ([]types.AttributeValue, error) {
+	l, err := d.decodeLen(r)
+	if err != nil {
+		return nil, err
+	}
+	var v = make([]types.AttributeValue, l)
+	for i := range l {
+		av, err := d.decode(r)
+		if err != nil {
+			return nil, err
+		}
+		v[i] = av
+	}
+	return v, nil
+}
+
+func (d *decoder) decodeMap(r io.Reader) (map[string]types.AttributeValue, error) {
+	l, err := d.decodeLen(r)
+	if err != nil {
+		return nil, err
+	}
+	var v = make(map[string]types.AttributeValue, l)
+	for range l {
+		s, err := d.decodeStringNumber(r)
+		if err != nil {
+			return nil, err
+		}
+		av, err := d.decode(r)
+		if err != nil {
+			return nil, err
+		}
+		v[s] = av
+	}
+	return v, nil
+}
+
+func (d *decoder) decodeLen(r io.Reader) (int, error) {
+	bl := make([]byte, 1)
+	if _, err := r.Read(bl); err != nil {
+		return 0, err
+	}
+	return int(bl[0]), nil
 }
 
 func (i *tinyamodbItem) Clone() Item {
