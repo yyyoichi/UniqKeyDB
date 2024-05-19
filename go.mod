@@ -4,7 +4,6 @@ go 1.22.2
 
 require (
 	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.32.3
-	github.com/google/uuid v1.6.0
 	github.com/stretchr/testify v1.9.0
 )
 

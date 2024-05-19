@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -452,54 +451,6 @@ func (d *decoder) decodeLen(r io.Reader) (int, error) {
 		return 0, err
 	}
 	return int(bl[0]), nil
-}
-
-type KeyTimeItem struct {
-	RawKey       string    `json:"k"`
-	sha256Key    []byte    `json:"-"`
-	strSha256Key string    `json:"-"`
-	Timestamp    time.Time `json:"-"`
-	UnixNano     int64     `json:"u"`
-}
-
-func NewKeyTimeItem(rawKey string) *KeyTimeItem {
-	i := &KeyTimeItem{RawKey: rawKey}
-	i.init()
-	return i
-}
-
-func (i *KeyTimeItem) SHA256Key() []byte {
-	return i.sha256Key
-}
-func (i *KeyTimeItem) StrSHA2526Key() string {
-	return i.strSha256Key
-}
-
-func (i *KeyTimeItem) Value() ([]byte, error) {
-	return json.Marshal(*i)
-}
-
-func (i *KeyTimeItem) Unmarshal(data []byte) error {
-	err := json.Unmarshal(data, i)
-	if err != nil {
-		return err
-	}
-	i.Timestamp = time.Unix(0, i.UnixNano)
-	return nil
-}
-
-func (i *KeyTimeItem) init() {
-	if i.Timestamp.IsZero() {
-		i.Timestamp = time.Now()
-	}
-	if i.UnixNano == 0 {
-		i.UnixNano = i.Timestamp.UnixNano()
-	}
-	if len(i.sha256Key) == 0 {
-		h := sha256.Sum256([]byte(i.RawKey))
-		i.sha256Key = h[:]
-		i.strSha256Key = toStrSha256(i.sha256Key)
-	}
 }
 
 func sum256(data []byte) (sha256Key []byte, strSha256Key string) {

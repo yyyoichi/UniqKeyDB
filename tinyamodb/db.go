@@ -10,21 +10,13 @@ import (
 	"strconv"
 )
 
-type TinyamoDb interface {
-	PutKey(context.Context, string) (*PutKeyItemOutput, error)
-	DeleteKey(context.Context, string) (*DeleteKeyItemOutput, error)
-	ReadKey(context.Context, string) (*ReadKeyItemOutput, error)
-	Close() error
-}
-
 type db struct {
-	TinyamoDb
 	// partition id start with 1
 	partitions map[int]*partition
 	c          Config
 }
 
-func New(dir string, c Config) (TinyamoDb, error) {
+func New(dir string, c Config) (*db, error) {
 	if _, err := os.Stat(dir); err != nil {
 		if err = os.Mkdir(dir, 0755); err != nil {
 			return nil, err
@@ -81,36 +73,6 @@ func New(dir string, c Config) (TinyamoDb, error) {
 	return db, nil
 }
 
-func (db *db) PutKey(ctx context.Context, key string) (*PutKeyItemOutput, error) {
-	item := NewKeyTimeItem(key)
-	p := db.determinePartition(item.sha256Key)
-	_, err := p.Put(item)
-	if err != nil {
-		return nil, err
-	}
-	return &PutKeyItemOutput{}, nil
-}
-func (db *db) ReadKey(ctx context.Context, key string) (*ReadKeyItemOutput, error) {
-	item := NewKeyTimeItem(key)
-	p := db.determinePartition(item.sha256Key)
-	err := p.Read(item)
-	if err != nil {
-		if errors.Is(err, io.EOF) {
-			return &ReadKeyItemOutput{Key: nil}, nil
-		}
-		return nil, err
-	}
-	return &ReadKeyItemOutput{Key: &item.RawKey}, nil
-}
-func (db *db) DeleteKey(ctx context.Context, key string) (*DeleteKeyItemOutput, error) {
-	item := NewKeyTimeItem(key)
-	p := db.determinePartition(item.sha256Key)
-	_, err := p.Delete(item)
-	if err != nil {
-		return nil, err
-	}
-	return &DeleteKeyItemOutput{}, nil
-}
 func (db *db) Close() error {
 	for _, p := range db.partitions {
 		if err := p.Close(); err != nil {

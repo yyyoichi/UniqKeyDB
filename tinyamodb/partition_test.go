@@ -46,7 +46,11 @@ func TestPartition(t *testing.T) {
 	require.Equal(t, want0.UnixNano, got0.UnixNano)
 
 	// not found
-	err = p.Read(NewKeyTimeItem("key2"))
+	got2, err := NewTinyamoDbItem(map[string]types.AttributeValue{
+		"key": &types.AttributeValueMemberS{Value: "key2"},
+	}, c)
+	require.NoError(t, err)
+	err = p.Read(got2)
 	require.Error(t, err)
 
 	// close and open
