@@ -3,9 +3,11 @@ package tinyamodb
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"time"
 
@@ -108,7 +110,7 @@ const (
 type encoder struct{}
 
 func (e *encoder) Encode(av types.AttributeValue, unixNano int64, w io.Writer) error {
-	if _, err := w.Write([]byte{byte(unixNano)}); err != nil {
+	if err := binary.Write(w, enc, uint64(unixNano)); err != nil {
 		return err
 	}
 	return e.encode(av, w)
@@ -261,12 +263,12 @@ func (e *encoder) encodeMap(v map[string]types.AttributeValue, w io.Writer) erro
 type decoder struct{}
 
 func (d *decoder) Decode(r io.Reader) (types.AttributeValue, int64, error) {
-	var unixNanoB = make([]byte, 1)
+	var unixNanoB = make([]byte, 8)
 	if _, err := r.Read(unixNanoB); err != nil {
 		return nil, 0, err
 	}
 	av, err := d.decode(r)
-	return av, int64(unixNanoB[0]), err
+	return av, int64(enc.Uint64(unixNanoB)), err
 }
 
 func (d *decoder) decode(r io.Reader) (types.AttributeValue, error) {
@@ -281,56 +283,72 @@ func (d *decoder) decode(r io.Reader) (types.AttributeValue, error) {
 			return nil, err
 		}
 		return &types.AttributeValueMemberS{Value: v}, nil
+
 	case _bS:
 		v, err := d.decodeSSet(r)
 		if err != nil {
 			return nil, err
 		}
 		return &types.AttributeValueMemberSS{Value: v}, nil
+
 	case _bn:
 		v, err := d.decodeString(r)
 		if err != nil {
 			return nil, err
 		}
 		return &types.AttributeValueMemberN{Value: v}, nil
+
 	case _bN:
 		v, err := d.decodeSSet(r)
 		if err != nil {
 			return nil, err
 		}
 		return &types.AttributeValueMemberNS{Value: v}, nil
+
 	case _bb:
 		v, err := d.decodeBytes(r)
 		if err != nil {
 			return nil, err
 		}
 		return &types.AttributeValueMemberB{Value: v}, nil
+
 	case _bB:
 		v, err := d.decodeBSet(r)
 		if err != nil {
 			return nil, err
 		}
 		return &types.AttributeValueMemberBS{Value: v}, nil
+
 	case _bo:
 		v, err := d.decodeBool(r)
 		if err != nil {
 			return nil, err
 		}
 		return &types.AttributeValueMemberBOOL{Value: v}, nil
+
+	case _bu:
+		v, err := d.decodeBool(r)
+		if err != nil {
+			return nil, err
+		}
+		return &types.AttributeValueMemberNULL{Value: v}, nil
+
 	case _bl:
 		v, err := d.decodeList(r)
 		if err != nil {
 			return nil, err
 		}
 		return &types.AttributeValueMemberL{Value: v}, nil
+
 	case _bm:
 		v, err := d.decodeMap(r)
 		if err != nil {
 			return nil, err
 		}
 		return &types.AttributeValueMemberM{Value: v}, nil
+
 	}
-	return nil, errors.New("unexpected identifier")
+	return nil, fmt.Errorf("unexpected identifier: '%v'", string(_bm))
 }
 
 func (d *decoder) decodeString(r io.Reader) (string, error) {
