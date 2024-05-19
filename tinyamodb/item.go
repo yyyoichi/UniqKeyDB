@@ -116,32 +116,72 @@ func (e *encoder) Encode(av types.AttributeValue, unixNano int64, w io.Writer) e
 func (e *encoder) encode(av types.AttributeValue, w io.Writer) error {
 	switch v := av.(type) {
 	case *types.AttributeValueMemberS:
+		if _, err := w.Write([]byte{_bs}); err != nil {
+			return err
+		}
 		return e.encodeString(v.Value, w)
+
 	case *types.AttributeValueMemberSS:
+		if _, err := w.Write([]byte{_bS}); err != nil {
+			return err
+		}
 		return e.encodeSSet(v.Value, w)
+
 	case *types.AttributeValueMemberN:
-		return e.encodeNumber(v.Value, w)
+		if _, err := w.Write([]byte{_bn}); err != nil {
+			return err
+		}
+		return e.encodeString(v.Value, w)
+
 	case *types.AttributeValueMemberNS:
-		return e.encodeNSet(v.Value, w)
+		if _, err := w.Write([]byte{_bN}); err != nil {
+			return err
+		}
+		return e.encodeSSet(v.Value, w)
+
 	case *types.AttributeValueMemberB:
+		if _, err := w.Write([]byte{_bb}); err != nil {
+			return err
+		}
 		return e.encodeBytes(v.Value, w)
+
 	case *types.AttributeValueMemberBS:
+		if _, err := w.Write([]byte{_bB}); err != nil {
+			return err
+		}
 		return e.encodeBSet(v.Value, w)
+
 	case *types.AttributeValueMemberBOOL:
+		if _, err := w.Write([]byte{_bo}); err != nil {
+			return err
+		}
 		return e.encodeBool(v.Value, w)
+
 	case *types.AttributeValueMemberNULL:
-		return e.encodeNull(v.Value, w)
+		if _, err := w.Write([]byte{_bu}); err != nil {
+			return err
+		}
+		return e.encodeBool(v.Value, w)
+
 	case *types.AttributeValueMemberL:
+		if _, err := w.Write([]byte{_bl}); err != nil {
+			return err
+		}
 		return e.encodeList(v.Value, w)
+
 	case *types.AttributeValueMemberM:
+		if _, err := w.Write([]byte{_bm}); err != nil {
+			return err
+		}
 		return e.encodeMap(v.Value, w)
+
 	}
 	return errors.New("unkown type")
 }
 
 func (e *encoder) encodeString(v string, w io.Writer) error {
 	bv := []byte(v)
-	if _, err := w.Write([]byte{_bs, byte(len(bv))}); err != nil {
+	if _, err := w.Write([]byte{byte(len(bv))}); err != nil {
 		return err
 	}
 	_, err := w.Write(bv)
@@ -149,7 +189,7 @@ func (e *encoder) encodeString(v string, w io.Writer) error {
 }
 
 func (e *encoder) encodeSSet(v []string, w io.Writer) error {
-	if _, err := w.Write([]byte{_bS, byte(len(v))}); err != nil {
+	if _, err := w.Write([]byte{byte(len(v))}); err != nil {
 		return err
 	}
 	for _, s := range v {
@@ -160,29 +200,8 @@ func (e *encoder) encodeSSet(v []string, w io.Writer) error {
 	return nil
 }
 
-func (e *encoder) encodeNumber(v string, w io.Writer) error {
-	bv := []byte(v)
-	if _, err := w.Write([]byte{_bn, byte(len(bv))}); err != nil {
-		return err
-	}
-	_, err := w.Write(bv)
-	return err
-}
-
-func (e *encoder) encodeNSet(v []string, w io.Writer) error {
-	if _, err := w.Write([]byte{_bN, byte(len(v))}); err != nil {
-		return err
-	}
-	for _, n := range v {
-		if err := e.encodeNumber(n, w); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func (e *encoder) encodeBytes(v []byte, w io.Writer) error {
-	if err := e.encodeLen(_bb, len(v), w); err != nil {
+	if _, err := w.Write([]byte{byte(len(v))}); err != nil {
 		return err
 	}
 	_, err := w.Write(v)
@@ -190,7 +209,7 @@ func (e *encoder) encodeBytes(v []byte, w io.Writer) error {
 }
 
 func (e *encoder) encodeBSet(v [][]byte, w io.Writer) error {
-	if _, err := w.Write([]byte{_bB, byte(len(v))}); err != nil {
+	if _, err := w.Write([]byte{byte(len(v))}); err != nil {
 		return err
 	}
 	for _, b := range v {
@@ -208,23 +227,12 @@ func (e *encoder) encodeBool(v bool, w io.Writer) error {
 	} else {
 		b = '0'
 	}
-	_, err := w.Write([]byte{_bo, b})
-	return err
-}
-
-func (e *encoder) encodeNull(v bool, w io.Writer) error {
-	var b byte
-	if v {
-		b = '1'
-	} else {
-		b = '0'
-	}
-	_, err := w.Write([]byte{_bu, b})
+	_, err := w.Write([]byte{b})
 	return err
 }
 
 func (e *encoder) encodeList(v []types.AttributeValue, w io.Writer) error {
-	if _, err := w.Write([]byte{_bl, byte(len(v))}); err != nil {
+	if _, err := w.Write([]byte{byte(len(v))}); err != nil {
 		return err
 	}
 	for _, av := range v {
@@ -236,7 +244,7 @@ func (e *encoder) encodeList(v []types.AttributeValue, w io.Writer) error {
 }
 
 func (e *encoder) encodeMap(v map[string]types.AttributeValue, w io.Writer) error {
-	if _, err := w.Write([]byte{_bm, byte(len(v))}); err != nil {
+	if _, err := w.Write([]byte{byte(len(v))}); err != nil {
 		return err
 	}
 	for k, av := range v {
@@ -248,11 +256,6 @@ func (e *encoder) encodeMap(v map[string]types.AttributeValue, w io.Writer) erro
 		}
 	}
 	return nil
-}
-
-func (e *encoder) encodeLen(_bx byte, l int, w io.Writer) error {
-	_, err := w.Write([]byte{_bx, byte(l)})
-	return err
 }
 
 type decoder struct{}
@@ -273,25 +276,25 @@ func (d *decoder) decode(r io.Reader) (types.AttributeValue, error) {
 	}
 	switch _bx[0] {
 	case _bs:
-		v, err := d.decodeStringNumber(r)
+		v, err := d.decodeString(r)
 		if err != nil {
 			return nil, err
 		}
 		return &types.AttributeValueMemberS{Value: v}, nil
 	case _bS:
-		v, err := d.decodeSNSet(r)
+		v, err := d.decodeSSet(r)
 		if err != nil {
 			return nil, err
 		}
 		return &types.AttributeValueMemberSS{Value: v}, nil
 	case _bn:
-		v, err := d.decodeStringNumber(r)
+		v, err := d.decodeString(r)
 		if err != nil {
 			return nil, err
 		}
 		return &types.AttributeValueMemberN{Value: v}, nil
 	case _bN:
-		v, err := d.decodeSNSet(r)
+		v, err := d.decodeSSet(r)
 		if err != nil {
 			return nil, err
 		}
@@ -309,7 +312,7 @@ func (d *decoder) decode(r io.Reader) (types.AttributeValue, error) {
 		}
 		return &types.AttributeValueMemberBS{Value: v}, nil
 	case _bo:
-		v, err := d.decodeBoolNull(r)
+		v, err := d.decodeBool(r)
 		if err != nil {
 			return nil, err
 		}
@@ -330,7 +333,7 @@ func (d *decoder) decode(r io.Reader) (types.AttributeValue, error) {
 	return nil, errors.New("unexpected identifier")
 }
 
-func (d *decoder) decodeStringNumber(r io.Reader) (string, error) {
+func (d *decoder) decodeString(r io.Reader) (string, error) {
 	v, err := d.decodeBytes(r)
 	if err != nil {
 		return "", err
@@ -338,14 +341,14 @@ func (d *decoder) decodeStringNumber(r io.Reader) (string, error) {
 	return string(v), nil
 }
 
-func (d *decoder) decodeSNSet(r io.Reader) ([]string, error) {
+func (d *decoder) decodeSSet(r io.Reader) ([]string, error) {
 	l, err := d.decodeLen(r)
 	if err != nil {
 		return nil, err
 	}
 	var v = make([]string, l)
 	for i := range l {
-		s, err := d.decodeStringNumber(r)
+		s, err := d.decodeString(r)
 		if err != nil {
 			return nil, err
 		}
@@ -382,7 +385,7 @@ func (d *decoder) decodeBSet(r io.Reader) ([][]byte, error) {
 	return v, nil
 }
 
-func (d *decoder) decodeBoolNull(r io.Reader) (bool, error) {
+func (d *decoder) decodeBool(r io.Reader) (bool, error) {
 	bv := make([]byte, 1)
 	if _, err := r.Read(bv); err != nil {
 		return false, err
@@ -413,7 +416,7 @@ func (d *decoder) decodeMap(r io.Reader) (map[string]types.AttributeValue, error
 	}
 	var v = make(map[string]types.AttributeValue, l)
 	for range l {
-		s, err := d.decodeStringNumber(r)
+		s, err := d.decodeString(r)
 		if err != nil {
 			return nil, err
 		}
